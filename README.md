@@ -1,5 +1,9 @@
 # Atividades FSO
 Este repositório é responsável pelas atividades praticas da materia de Fundamentos de Sistemas Operacionais (FSO)
+Alunos:
+* João Paulo Busche
+* Matheus Costa
+* Weiller Fernandes
 
 ## Sudoku
 * Para executar o codigo do sudoku primeiramente deve-se entrar na pasta _Sudoko/_.
