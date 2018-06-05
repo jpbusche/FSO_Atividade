@@ -16,49 +16,17 @@ typedef struct student {
 } Student;
 
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_t tae;
+pthread_attr_t attr_ae;
 sem_t semaphore;
 
-void *student_actions(void *param) {
-  int r;
-  Student * stu = (Student*)param;
-  int n = stu->num_help;
-  while(n != 0) {
-    printf("Estudante %d esta programando.\n", stu->id);
-    sleep(RAND_TIME);
-    printf("Estudante %d foi procurar ajuda\n", stu->id);
-    if(sem_trywait(&semaphore) == 0) {
-      printf("Estudante %d esta sentado esperando o AE\n", stu->id);
-      pthread_mutex_lock(&lock);
-      printf("Estudante %d esta sendo ajudado pelo AE\n", stu->id);
-      n--;
-      sleep(RAND_TIME);
-      pthread_mutex_unlock(&lock);
-      sem_post(&semaphore);
-    } else printf("Sem cadeiras disponiveis, estudante %d voltou a programar\n", stu->id);
-  }
-  printf("Estudante %d terminou suas atividades\n", stu->id);
-}
-
-// TODO Implementar açoes do AE
-void *ae_action(void* param){
-  // printf("AE esta dormindo esperando um estudante.\n");
-  // sem_wait(&student_come);
-  // printf("O AE acordou e esta indo conferir a fila.\n");
-  // ajudando estudante
-  // printf("AE esta ajudando o estudante %d.\n", student.id);
-  // terminando de ajudar conferir se tem outro estudante
-  // int numbers_of_student =
-  // if(numbers_of_student > 0){
-  //   return ae_action();// se tiver outro estudante, ajudar
-  // } else {
-  //   // se não tiver estudante, dormir
-  // }
-}
+void *student_actions(void *param);
+void *ae_action(void *param);
 
 int main() {
   srand(time(NULL));
-  // int students = rand() % (MAX_STUDENTS - MIN_STUDENTS + 1) + MIN_STUDENTS;
-  int students = MIN_STUDENTS;
+  int students = rand() % (MAX_STUDENTS - MIN_STUDENTS + 1) + MIN_STUDENTS;
+  // int students = MIN_STUDENTS;
   int chairs;
   pthread_t tstudents[students];
   pthread_attr_t attr_s[students];
@@ -76,7 +44,36 @@ int main() {
   for(int i = 0; i < students; ++i) {
     pthread_join(tstudents[i], NULL);
   }
+  printf("AE voltou a dormir\n");
   sem_destroy(&semaphore);
   pthread_mutex_destroy(&lock);
   return 0;
+}
+
+void *student_actions(void *param) {
+  Student * stu = (Student*)param;
+  int n = stu->num_help;
+  while(n != 0) {
+    printf("Estudante %d esta programando.\n", stu->id);
+    sleep(RAND_TIME);
+    printf("Estudante %d foi procurar ajuda\n", stu->id);
+    if(sem_trywait(&semaphore) == 0) {
+      printf("Estudante %d esta sentado esperando o AE\n", stu->id);
+      pthread_mutex_lock(&lock);
+      pthread_attr_init(&attr_ae);
+      pthread_create(&tae, &attr_ae, ae_action, stu);
+      pthread_join(tae, NULL);
+      n--;
+      pthread_mutex_unlock(&lock);
+      sem_post(&semaphore);
+    } else printf("Sem cadeiras disponiveis, estudante %d voltou a programar\n", stu->id);
+  }
+  printf("Estudante %d terminou suas atividades\n", stu->id);
+}
+
+void *ae_action(void* param){
+  Student * stu = (Student*)param;
+  printf("AE esta ajudando o estudante %d\n", stu->id);
+  sleep(RAND_TIME);
+  printf("AE terminou de ajudar o estudante %d\n", stu->id);
 }
