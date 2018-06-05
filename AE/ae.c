@@ -8,38 +8,42 @@
 #define MAX_STUDENTS 40
 #define MIN_STUDENTS 3
 #define MAX_HELPS 3
-#define RAND_TIME (rand() % 9) + 1;
+#define RAND_TIME rand() % 10 + 1
 
-struct Student{
+typedef struct student {
   int id;
-  int help_numbers;
-};
+  int num_help; 
+} Student;
 
-pthread_mutex_t mutex;
-sem_t help;
-sem_t ae_ready;
-sem_t student_ready;
-sem_t sit_down;
-sem_t student_come;
-sem_t student_leave;
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+sem_t semaphore;
 
-void *student_action(void* param) {
-  struct Student *student = (struct Student *)param;
-  int thread_id = student->id;
-  printf("Estudante %d indo tirar duvida com o AE.\n", thread_id);
-  sem_post(&student_come);
-  printf("Estudante %d esperando pelo AE.\n", thread_id);
-  sem_post(&student_ready);
-  sem_wait(&ae_ready);
-
-  printf("Estudante %d saiu.\n", thread_id);
-  sem_post(&student_leave);
+void *student_actions(void *param) {
+  int r;
+  Student * stu = (Student*)param;
+  int n = stu->num_help;
+  while(n != 0) {
+    printf("Estudante %d esta programando.\n", stu->id);
+    sleep(RAND_TIME);
+    printf("Estudante %d foi procurar ajuda\n", stu->id);
+    if(sem_trywait(&semaphore) == 0) {
+      printf("Estudante %d esta sentado esperando o AE\n", stu->id);
+      pthread_mutex_lock(&lock);
+      printf("Estudante %d esta sendo ajudado pelo AE\n", stu->id);
+      n--;
+      sleep(RAND_TIME);
+      pthread_mutex_unlock(&lock);
+      sem_post(&semaphore);
+    } else printf("Sem cadeiras disponiveis, estudante %d voltou a programar\n", stu->id);
+  }
+  printf("Estudante %d terminou suas atividades\n", stu->id);
 }
 
+// TODO Implementar açoes do AE
 void *ae_action(void* param){
-  printf("AE esta dormindo esperando um estudante.\n");
-  sem_wait(&student_come);
-  printf("O AE acordou e esta indo conferir a fila.\n");
+  // printf("AE esta dormindo esperando um estudante.\n");
+  // sem_wait(&student_come);
+  // printf("O AE acordou e esta indo conferir a fila.\n");
   // ajudando estudante
   // printf("AE esta ajudando o estudante %d.\n", student.id);
   // terminando de ajudar conferir se tem outro estudante
@@ -53,37 +57,26 @@ void *ae_action(void* param){
 
 int main() {
   srand(time(NULL));
-  int students = rand() % (MAX_STUDENTS - MIN_STUDENTS) + MIN_STUDENTS, chairs = students / 2;
-  pthread_t tae, tstudent[students];
-	pthread_attr_t attr_a, attr_s[students];
-  sem_init(&help, 0, 0);
-  sem_init(&ae_ready, 0, 0);
-  sem_init(&student_ready, 0, 0);
-  sem_init(&sit_down, 0, 1);
-  sem_init(&student_come, 0, 0);
-  sem_init(&student_leave, 0, 0);
-
-  pthread_create(&tae, &attr_a, ae_action, NULL);
-
-  struct Student student[students];
-  for (int i = 0; i < students; ++i) {
-    student[i].id = i;
-    student[i].help_numbers = MAX_HELPS;
+  // int students = rand() % (MAX_STUDENTS - MIN_STUDENTS + 1) + MIN_STUDENTS;
+  int students = MIN_STUDENTS;
+  int chairs;
+  pthread_t tstudents[students];
+  pthread_attr_t attr_s[students];
+  if(students % 2 == 0) chairs = students / 2;
+  else chairs = students / 2 + 1;
+  printf("Numero de estudantes: %d\nNumero de cadeiras: %d\n", students, chairs);
+  sem_init(&semaphore, 0, chairs);
+  Student stus[students];
+  for(int i = 0; i < students; ++i) {
+    stus[i].id = i;
+    stus[i].num_help = MAX_HELPS;
     pthread_attr_init(&attr_s[i]);
-    pthread_create(&tstudent[i], &attr_s[i], student_action, &student[i]);
+    pthread_create(&tstudents[i], &attr_s[i], student_actions, &stus[i]);
   }
-
-  for(int i = 0; i < students; i++) {
-    pthread_join(tstudent[i], NULL);
+  for(int i = 0; i < students; ++i) {
+    pthread_join(tstudents[i], NULL);
   }
-
-  sem_destroy(&help);
-  sem_destroy(&ae_ready);
-  sem_destroy(&student_ready);
-  sem_destroy(&sit_down);
-  sem_destroy(&student_come);
-  sem_destroy(&student_leave);
-  pthread_exit(NULL);
-
+  sem_destroy(&semaphore);
+  pthread_mutex_destroy(&lock);
   return 0;
 }
